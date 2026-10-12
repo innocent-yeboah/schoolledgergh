@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { JetBrains_Mono, Outfit, Playfair_Display } from "next/font/google";
+import { readAppEnv } from "@/lib/env/app";
 import "./globals.css";
 
 const outfit = Outfit({ subsets: ["latin"], variable: "--font-outfit" });
@@ -29,9 +30,15 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const appEnv = readAppEnv();
   return (
     <html lang="en">
       <body className={`${outfit.variable} ${display.variable} ${mono.variable} antialiased`}>
+        {appEnv === "staging" ? (
+          <p role="status" className="bg-gold-100 px-4 py-2 text-center text-sm font-semibold text-ink-900">
+            Staging. This is not the production database.
+          </p>
+        ) : null}
         {children}
       </body>
     </html>

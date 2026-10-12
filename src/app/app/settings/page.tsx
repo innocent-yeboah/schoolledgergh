@@ -69,7 +69,7 @@ function paystackLabel(mode: string | undefined): string {
   if (mode === "test") return "Paystack test mode is on. Mobile-money links use the test secret, and the webhook records a payment only after the signature and verify call succeed.";
   if (mode === "live") return "Paystack live mode is on. Real charges can be recorded by the webhook.";
   if (mode === "blocked") return "A live Paystack secret is set, but PAYSTACK_LIVE is not true, so no charge will be created.";
-  return "Paystack is not configured. Links stay a stub and no money moves until PAYSTACK_SECRET_KEY is an sk_test_ key.";
+  return "Paystack is not configured. Links stay a stub and no money moves until a test secret is set on the server.";
 }
 
 function PeriodForm() {

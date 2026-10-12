@@ -13,6 +13,9 @@ const eslintConfig = [
       "next-env.d.ts",
       "supabase/.temp/**",
       "public/sw.js",
+      "test-results/**",
+      "playwright-report/**",
+      "blob-report/**",
     ],
   },
 ];
