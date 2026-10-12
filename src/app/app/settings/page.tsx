@@ -9,7 +9,7 @@ import { supportEmail, supportWhatsApp } from "@/lib/supabase/env";
 export default function SettingsPage() {
   const ledger = useLedger();
   const school = ledger.school;
-  const [sms, setSms] = useState<{ configured: boolean; provider: string | null; senderId: string } | null>(null);
+  const [sms, setSms] = useState<{ configured: boolean; provider: string | null; senderId: string; paystackMode?: string } | null>(null);
 
   useEffect(() => {
     if (ledger.mode !== "live") return;
@@ -41,11 +41,12 @@ export default function SettingsPage() {
       </Card>
       <Card title="SMS">
         {ledger.mode === "demo" ? (
-          <p className="text-sm">Demo mode does not send SMS and does not store a provider key.</p>
+          <p className="text-sm">Demo mode does not send SMS or create a Paystack charge, and it does not store a provider key.</p>
         ) : (
           <div className="space-y-2 text-sm">
-            <p>The Hubtel or Arkesel key stays in the server environment. It is not saved on the school and it is not sent to the browser.</p>
-            <p>{sms?.configured ? `Ready to send as ${sms.senderId} via ${sms.provider}.` : "SMS is not live yet. Set SMS_PROVIDER, SMS_API_KEY, and SMS_LIVE=true on the server."}</p>
+            <p>Arkesel is the default SMS provider. Hubtel and mNotify are selected with SMS_PROVIDER. The API key stays on the server.</p>
+            <p>{sms?.configured ? `Ready to send as ${sms.senderId} via ${sms.provider}.` : "SMS is in stub mode until SMS_API_KEY and SMS_LIVE=true are set. Nothing is marked sent."}</p>
+            <p>{paystackLabel(sms?.paystackMode)}</p>
           </div>
         )}
       </Card>
@@ -62,6 +63,13 @@ export default function SettingsPage() {
       </Card>
     </div>
   );
+}
+
+function paystackLabel(mode: string | undefined): string {
+  if (mode === "test") return "Paystack test mode is on. Mobile-money links use the test secret, and the webhook records a payment only after the signature and verify call succeed.";
+  if (mode === "live") return "Paystack live mode is on. Real charges can be recorded by the webhook.";
+  if (mode === "blocked") return "A live Paystack secret is set, but PAYSTACK_LIVE is not true, so no charge will be created.";
+  return "Paystack is not configured. Links stay a stub and no money moves until PAYSTACK_SECRET_KEY is an sk_test_ key.";
 }
 
 function PeriodForm() {

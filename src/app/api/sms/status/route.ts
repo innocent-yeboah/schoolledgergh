@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { readSmsEnv, smsIsLive } from "@/lib/sms/adapter";
+import { readSmsEnv, resolveSmsProvider, smsIsLive } from "@/lib/sms/adapter";
+import { paystackMode, readPaystackEnv } from "@/lib/paystack/adapter";
 import { createClient } from "@/lib/supabase/server";
 
 export async function GET() {
@@ -11,10 +12,11 @@ export async function GET() {
     return NextResponse.json({ error: "Supabase is not configured." }, { status: 503 });
   }
   const env = readSmsEnv();
-  const provider = env.SMS_PROVIDER === "hubtel" || env.SMS_PROVIDER === "arkesel" ? env.SMS_PROVIDER : null;
+  const paystack = readPaystackEnv();
   return NextResponse.json({
     configured: smsIsLive(env),
-    provider,
+    provider: resolveSmsProvider(env),
     senderId: env.SMS_SENDER_ID || "SchoolGH",
+    paystackMode: paystackMode(paystack),
   });
 }

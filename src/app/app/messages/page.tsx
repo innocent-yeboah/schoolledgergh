@@ -5,7 +5,8 @@ import { Button, Card, EmptyState, Field, LogBadge, SelectInput, TextArea, TextI
 import { useLedger } from "@/context/ledger";
 import { downloadCsv } from "@/lib/csv";
 import { bulkBccMailto, individualMailto } from "@/lib/email/mailto";
-import { DEFAULT_TPL_REMINDER, fillTemplate, reminderVars, studentName } from "@/lib/domain";
+import { DEFAULT_TPL_REMINDER, fillTemplate, PAYMENT_LINK_PLACEHOLDER, reminderVars, studentName } from "@/lib/domain";
+import { personaliseReminder } from "@/lib/sms/reminders";
 import { formatWhen, todayISO } from "@/lib/format";
 import { whatsAppLink, whatsAppShareLink } from "@/lib/phone";
 import type { StudentView } from "@/lib/types";
@@ -19,7 +20,7 @@ export default function MessagesPage() {
   const [studentId, setStudentId] = useState("");
   const [kind, setKind] = useState<"reminder" | "general" | "custom">("reminder");
   const [custom, setCustom] = useState("");
-  const [sms, setSms] = useState("");
+  const [sms, setSms] = useState("Dear {parent_name}, {student_name} owes GH₵{balance} for {term} ({academic_year}). Pay with mobile money: {payment_link}");
   const [subject, setSubject] = useState(ledger.school ? `School fee reminder — ${ledger.school.term}` : "School notice");
   const [body, setBody] = useState("");
   const recipients = useMemo(() => filterStudents(ledger.students, audience, studentId), [audience, ledger.students, studentId]);
@@ -83,6 +84,7 @@ export default function MessagesPage() {
                 <div>
                   <p className="font-semibold">{item.recipient || item.studentLabel}</p>
                   <p className="text-sm text-ink-400">{item.channel} · {item.messageType} · {formatWhen(item.createdAt)}</p>
+                  {item.txnId ? <p className="font-mono text-xs text-ink-400">{item.txnId}</p> : null}
                 </div>
                 <LogBadge status={item.status} />
               </li>
@@ -97,24 +99,30 @@ export default function MessagesPage() {
 function SmsPanel({ recipients, audience, setAudience, message, setMessage }: { recipients: StudentView[]; audience: Audience; setAudience: (value: Audience) => void; message: string; setMessage: (value: string) => void }) {
   const ledger = useLedger();
   const [pending, setPending] = useState(false);
+  const owing = audience !== "all";
+  const sample = recipients.find((student) => student.balance > 0.001) ?? recipients[0];
+  const preview = sample && ledger.school
+    ? personaliseReminder(message, { ...reminderVars(ledger.school, sample, PAYMENT_LINK_PLACEHOLDER), payment_link: PAYMENT_LINK_PLACEHOLDER })
+    : "Add a student to preview a personal message.";
   return (
     <Card title="SMS">
-      <p className="mb-3 rounded-xl bg-gold-100 px-3 py-3 text-sm">SMS goes through the server. The provider key is never stored in the browser or the school record. A message is logged as sent only when Hubtel or Arkesel accepts it.</p>
+      <p className="mb-3 rounded-xl bg-gold-100 px-3 py-3 text-sm">Each parent gets their own balance and mobile-money link. The provider key stays on the server. A row is logged as sent only when Arkesel, Hubtel, or mNotify accepts that message.</p>
       <Field label="Send to">
-        <SelectInput value={audience === "single" || audience === "paid" ? "owing" : audience} onChange={(event) => setAudience(event.target.value as Audience)}>
+        <SelectInput value={owing ? "owing" : "all"} onChange={(event) => setAudience(event.target.value as Audience)}>
+          <option value="owing">All owing parents</option>
           <option value="all">All parents</option>
-          <option value="owing">Parents with a balance</option>
         </SelectInput>
       </Field>
       <Field label="Message">
-        <TextArea maxLength={320} value={message} onChange={(event) => setMessage(event.target.value)} placeholder="Use {parent_name}, {student_name}, {balance}, {term}, {academic_year}" />
+        <TextArea maxLength={480} value={message} onChange={(event) => setMessage(event.target.value)} placeholder="Use {parent_name}, {student_name}, {balance}, {payment_link}" />
       </Field>
-      <p className="mb-3 text-right font-mono text-xs text-ink-400">{message.length}/320 · {recipients.length} parents</p>
+      <pre className="mb-3 rounded-xl bg-mint-50 p-3 text-sm whitespace-pre-wrap">{preview}</pre>
+      <p className="mb-3 text-right font-mono text-xs text-ink-400">{message.length}/480 · {recipients.length} parents</p>
       <Button
         type="button"
         variant="sms"
         className="w-full"
-        disabled={pending}
+        disabled={pending || recipients.length === 0}
         onClick={async () => {
           if (ledger.mode === "demo") {
             ledger.report("Demo mode does not send SMS, so nothing was marked as sent.", "err");
@@ -125,13 +133,18 @@ function SmsPanel({ recipients, audience, setAudience, message, setMessage }: { 
             const response = await fetch("/api/sms/send", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ studentIds: recipients.map((student) => student.id), message }),
+              body: JSON.stringify({
+                audience: owing ? "owing" : "selected",
+                studentIds: recipients.map((student) => student.id),
+                message,
+              }),
             });
-            const body = (await response.json()) as { error?: string; sent?: number; failed?: number; errors?: string[] };
+            const body = (await response.json()) as { error?: string; sent?: number; failed?: number; errors?: string[]; linkWarnings?: string[] };
             await ledger.refresh();
             if (!response.ok) throw new Error(body.error || body.errors?.[0] || "SMS was not sent.");
             if ((body.sent ?? 0) === 0) throw new Error(body.errors?.[0] || "No SMS was sent.");
-            ledger.report(`Sent ${body.sent}. ${body.failed ? `${body.failed} failed.` : ""}`.trim());
+            const linkNote = body.linkWarnings?.[0] ? ` ${body.linkWarnings[0]}` : "";
+            ledger.report(`Sent ${body.sent}. ${body.failed ? `${body.failed} failed.` : ""}${linkNote}`.trim());
           } catch (error) {
             ledger.report(error instanceof Error ? error.message : "SMS was not sent.", "err");
           } finally {
@@ -139,7 +152,7 @@ function SmsPanel({ recipients, audience, setAudience, message, setMessage }: { 
           }
         }}
       >
-        {pending ? "Sending…" : "Send SMS"}
+        {pending ? "Sending…" : owing ? "Text all owing parents" : "Send SMS"}
       </Button>
     </Card>
   );
