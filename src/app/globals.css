@@ -1,0 +1,41 @@
+@import "tailwindcss";
+
+@theme {
+  --color-forest-950: #030d06;
+  --color-forest-900: #07421f;
+  --color-forest-800: #0a5c2e;
+  --color-forest-700: #0d7a3e;
+  --color-mint-50: #f2f7f4;
+  --color-mint-100: #e6f4ec;
+  --color-mint-200: #cce9d8;
+  --color-gold-100: #fef0d6;
+  --color-gold-600: #b8730a;
+  --color-clay-100: #fcecea;
+  --color-clay-700: #9b2b1e;
+  --color-ink-400: #5a7a65;
+  --color-ink-700: #284032;
+  --color-ink-900: #0c1810;
+  --font-sans: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-display), Georgia, serif;
+  --font-mono: var(--font-mono), ui-monospace, monospace;
+}
+
+body {
+  background: var(--color-mint-50);
+  color: var(--color-ink-900);
+  font-family: var(--font-sans);
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  touch-action: manipulation;
+}
+
+input,
+select,
+textarea {
+  font-size: 16px;
+}

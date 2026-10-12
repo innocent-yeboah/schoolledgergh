@@ -1,0 +1,17 @@
+{
+  "id": "/",
+  "name": "SchoolLedger GH",
+  "short_name": "SchoolLedger",
+  "description": "School fee management for Ghanaian schools.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F2F7F4",
+  "theme_color": "#07421F",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
