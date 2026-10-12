@@ -199,7 +199,7 @@ Dependabot (`.github/dependabot.yml`) opens weekly pull requests for npm and Git
 
 ## Still to do
 
-- Scheduled fee reminders. Owing parents can be texted now, but nothing sends on a clock.
+- Scheduled fee reminders. Owing parents can be texted now, but nothing sends on a clock. Build that later as config, not code: one reminder workflow driven by a per-school settings row. The row stores trigger timing relative to the due date, the nudge count, escalation rules as JSONB, the message templates, and channel flags for SMS, WhatsApp, and email. Every school inherits the same defaults and can toggle them. Do not add a separate code path per school. The table is not in the schema yet. The next migration that introduces reminders should add it (one row per school) and should leave `schools.tpl_reminder` as the manual template.
 - PDF or printable receipts. The receipt is an on-screen preview plus WhatsApp.
 - A real mailbox for bulk email. Parents are contacted through the device mail app, with BCC or one message each.
 - Handset delivery reports from the SMS provider. `sent` means the provider accepted the message.
