@@ -7,6 +7,7 @@ import { readLastLedgerCache, writeLedgerCache } from "@/lib/data/cache";
 import { LiveLedger } from "@/lib/data/live";
 import { DemoLedger } from "@/lib/demo/store";
 import { buildStudentViews } from "@/lib/domain";
+import { RouteStatus } from "@/components/route-status";
 import { errorMessage, isNetworkError } from "@/lib/format";
 import { readAppMode, writeAppMode } from "@/lib/mode";
 import { createClient } from "@/lib/supabase/client";
@@ -346,12 +347,17 @@ export function LedgerProvider({ children }: { children: React.ReactNode }) {
 
 function LoadFailure({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
-    <main className="mx-auto flex min-h-dvh max-w-lg flex-col justify-center gap-4 p-6">
-      <h1 className="font-display text-3xl font-semibold">The school could not be loaded</h1>
-      <p className="text-ink-700">{message}</p>
-      <button type="button" className="min-h-12 rounded-xl bg-forest-800 px-4 font-semibold text-white" onClick={onRetry}>
-        Try again
-      </button>
+    <main className="mx-auto flex min-h-dvh max-w-lg flex-col justify-center p-6">
+      <RouteStatus
+        tone="error"
+        title="The school could not be loaded"
+        body={message}
+        action={
+          <button type="button" className="inline-flex min-h-12 items-center justify-center rounded-xl bg-white px-4 font-semibold text-clay-700" onClick={onRetry}>
+            Try again
+          </button>
+        }
+      />
     </main>
   );
 }
