@@ -88,6 +88,7 @@ describe("phones and csv", () => {
 describe("routing", () => {
   it("keeps demo and signed-out visitors on the right screen", () => {
     expect(decideRedirect({ pathname: "/", demo: "", signedIn: false, supabaseConfigured: false })).toBe("/login");
+    expect(decideRedirect({ pathname: "/app", demo: "", signedIn: false, supabaseConfigured: true })).toBe("/login");
     expect(decideRedirect({ pathname: "/", demo: "school", signedIn: false, supabaseConfigured: false })).toBe("/app");
     expect(decideRedirect({ pathname: "/admin", demo: "school", signedIn: false, supabaseConfigured: true })).toBe("/app");
     expect(decideRedirect({ pathname: "/app", demo: "admin", signedIn: false, supabaseConfigured: true })).toBe("/admin");

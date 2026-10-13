@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { Icon } from "@/components/icons";
+import { RouteStatus } from "@/components/route-status";
 import { Button, Notice } from "@/components/ui";
 import { useLedger } from "@/context/ledger";
 import { periodLabel, suggestedAcademicPeriod } from "@/lib/academic";
@@ -59,7 +60,13 @@ export function SchoolShell({ children }: { children: React.ReactNode }) {
             <p className="rounded-2xl bg-gold-100 px-4 py-3 text-sm text-ink-700">Offline copy. New payments and edits are refused until the connection returns.</p>
           ) : null}
           {ledger.notice ? <Notice type={ledger.notice.type} text={ledger.notice.text} onDismiss={ledger.dismissNotice} /> : null}
-          {ledger.school ? children : <SetupSchool />}
+          {!ledger.ready ? (
+            <RouteStatus title="Loading your school" body="Students, fees, and the current term are on the way." />
+          ) : ledger.school ? (
+            children
+          ) : (
+            <SetupSchool />
+          )}
         </div>
       </div>
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-mint-200 bg-white pb-[env(safe-area-inset-bottom)] md:hidden">

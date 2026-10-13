@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon } from "@/components/icons";
+import { RouteStatus } from "@/components/route-status";
 import { Notice } from "@/components/ui";
 import { useAdmin } from "@/context/admin";
 
@@ -42,10 +43,24 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       </header>
       <div className="mx-auto grid max-w-5xl gap-4 px-4 py-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] md:pb-8">
         {admin.mode === "demo" ? <p className="rounded-2xl bg-gold-100 px-4 py-3 text-sm">This is demo admin data. It never reads or writes the live database.</p> : null}
-        {admin.error ? <Notice type="err" text={admin.error} onDismiss={admin.dismiss} /> : null}
+        {admin.error && admin.mode !== "denied" && admin.mode !== "unconfigured" ? <Notice type="err" text={admin.error} onDismiss={admin.dismiss} /> : null}
         {admin.notice ? <Notice type="ok" text={admin.notice} onDismiss={admin.dismiss} /> : null}
-        {admin.mode === "loading" ? <p>Loading admin…</p> : null}
-        {admin.mode === "denied" || admin.mode === "unconfigured" ? null : children}
+        {admin.mode === "loading" ? (
+          <RouteStatus title="Loading admin" body="Checking the platform account and the school list." />
+        ) : admin.mode === "denied" || admin.mode === "unconfigured" ? (
+          <RouteStatus
+            tone="error"
+            title="Admin is unavailable"
+            body={admin.error || "Sign in with a platform admin account."}
+            action={
+              <a href="/login" className="inline-flex min-h-12 items-center justify-center rounded-xl bg-white px-4 font-semibold text-clay-700">
+                Back to sign in
+              </a>
+            }
+          />
+        ) : (
+          children
+        )}
       </div>
       <nav className="fixed inset-x-0 bottom-0 border-t border-mint-200 bg-white pb-[env(safe-area-inset-bottom)] md:hidden">
         <ul className="grid grid-cols-4">
