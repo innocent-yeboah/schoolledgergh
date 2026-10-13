@@ -1,4 +1,6 @@
-export type SmsProviderName = "hubtel" | "arkesel";
+export type SmsProviderName = "hubtel" | "arkesel" | "mnotify";
+
+export const DEFAULT_SMS_PROVIDER: SmsProviderName = "arkesel";
 
 export type SmsSendInput = {
   to: string;
@@ -30,8 +32,18 @@ export function readSmsEnv(source: Record<string, string | undefined> = process.
   };
 }
 
+export function resolveSmsProvider(env: SmsEnv): SmsProviderName | null {
+  const raw = env.SMS_PROVIDER?.trim().toLowerCase() ?? "";
+  if (!raw) return DEFAULT_SMS_PROVIDER;
+  if (raw === "hubtel" || raw === "arkesel" || raw === "mnotify") return raw;
+  return null;
+}
+
 export function smsIsLive(env: SmsEnv): boolean {
-  return env.SMS_LIVE === "true" && Boolean(env.SMS_API_KEY) && (env.SMS_PROVIDER === "hubtel" || env.SMS_PROVIDER === "arkesel");
+  const provider = resolveSmsProvider(env);
+  if (!provider || env.SMS_LIVE !== "true" || !env.SMS_API_KEY?.trim()) return false;
+  if (provider === "hubtel" && !env.SMS_CLIENT_ID?.trim()) return false;
+  return true;
 }
 
 export async function sendSms(
@@ -39,12 +51,12 @@ export async function sendSms(
   env: SmsEnv = readSmsEnv(),
   fetchImpl: FetchLike = fetch,
 ): Promise<SmsSendResult> {
-  const provider = env.SMS_PROVIDER;
+  const provider = resolveSmsProvider(env);
   const apiKey = env.SMS_API_KEY?.trim() ?? "";
-  const senderId = input.senderId.trim() || env.SMS_SENDER_ID?.trim() || "SchoolGH";
+  const senderId = (input.senderId.trim() || env.SMS_SENDER_ID?.trim() || "SchoolGH").slice(0, 11);
 
-  if (provider !== "hubtel" && provider !== "arkesel") {
-    return { ok: false, attempted: false, error: "SMS is not configured. Set SMS_PROVIDER to hubtel or arkesel on the server." };
+  if (!provider) {
+    return { ok: false, attempted: false, error: "SMS is not configured. Set SMS_PROVIDER to arkesel, hubtel, or mnotify on the server." };
   }
   if (!apiKey) {
     return { ok: false, attempted: false, error: "SMS is not configured. The server has no SMS_API_KEY, so nothing was sent." };
@@ -63,6 +75,9 @@ export async function sendSms(
   try {
     if (provider === "hubtel") {
       return await sendHubtel({ to: input.to, message: input.message, senderId, apiKey, clientId: env.SMS_CLIENT_ID?.trim() ?? "" }, fetchImpl);
+    }
+    if (provider === "mnotify") {
+      return await sendMnotify({ to: input.to, message: input.message, senderId, apiKey }, fetchImpl);
     }
     return await sendArkesel({ to: input.to, message: input.message, senderId, apiKey }, fetchImpl);
   } catch (error) {
@@ -114,12 +129,49 @@ async function sendArkesel(
   return { ok: true, attempted: true, providerMessageId };
 }
 
+async function sendMnotify(
+  input: { to: string; message: string; senderId: string; apiKey: string },
+  fetchImpl: FetchLike,
+): Promise<SmsSendResult> {
+  const response = await fetchImpl(`https://api.mnotify.com/api/sms/quick?key=${encodeURIComponent(input.apiKey)}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      recipient: [input.to],
+      sender: input.senderId,
+      message: input.message,
+      is_schedule: false,
+      schedule_date: "",
+    }),
+  });
+  const body = await readJson(response);
+  const accepted = response.ok && textField(body, "status") === "success" && (textField(body, "code") === "2000" || numberField(body, "code") === 2000);
+  if (!accepted) {
+    return { ok: false, attempted: true, error: textField(body, "message") ?? `mNotify returned ${response.status}.` };
+  }
+  return { ok: true, attempted: true, providerMessageId: summaryId(body) ?? "mnotify" };
+}
+
 async function readJson(response: Response): Promise<unknown> {
   try {
     return await response.json();
   } catch {
     return {};
   }
+}
+
+function numberField(body: unknown, key: string): number | null {
+  if (!body || typeof body !== "object" || !(key in body)) return null;
+  const value = (body as Record<string, unknown>)[key];
+  return typeof value === "number" ? value : null;
+}
+
+function summaryId(body: unknown): string | null {
+  if (!body || typeof body !== "object" || !("summary" in body)) return null;
+  const summary = (body as { summary?: unknown }).summary;
+  if (!summary || typeof summary !== "object" || !("_id" in summary)) return null;
+  const value = (summary as { _id?: unknown })._id;
+  return typeof value === "string" && value ? value : null;
 }
 
 function textField(body: unknown, key: string): string | null {

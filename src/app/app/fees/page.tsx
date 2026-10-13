@@ -77,11 +77,14 @@ function FeesPage() {
             </SelectInput>
           </Field>
           {student ? (
-            <div className="mb-3 rounded-xl bg-mint-50 p-3 text-sm">
-              <p className="flex justify-between"><span>Term fee</span><strong>{formatCedis(student.termFee)}</strong></p>
-              <p className="flex justify-between"><span>Paid from the ledger</span><strong>{formatCedis(student.paid)}</strong></p>
-              <p className="flex justify-between border-t border-mint-200 pt-2"><span>Balance</span><strong>{formatCedis(student.balance)}</strong></p>
-            </div>
+            <>
+              <div className="mb-3 rounded-xl bg-mint-50 p-3 text-sm">
+                <p className="flex justify-between"><span>Term fee</span><strong>{formatCedis(student.termFee)}</strong></p>
+                <p className="flex justify-between"><span>Paid from the ledger</span><strong>{formatCedis(student.paid)}</strong></p>
+                <p className="flex justify-between border-t border-mint-200 pt-2"><span>Balance</span><strong>{formatCedis(student.balance)}</strong></p>
+              </div>
+              <MomoLink studentId={student.id} balance={student.balance} />
+            </>
           ) : null}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label="Amount (GH₵)"><TextInput inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)} required /></Field>
@@ -132,6 +135,49 @@ function FeesPage() {
         ) : <EmptyState title="No payments yet" body="Recorded payments will appear here." />}
       </Card>
       {receipt && student ? <ReceiptModal receipt={receipt} onClose={() => setReceipt(null)} /> : null}
+    </div>
+  );
+}
+
+function MomoLink({ studentId, balance }: { studentId: string; balance: number }) {
+  const ledger = useLedger();
+  const [link, setLink] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+  return (
+    <div className="mb-3 grid gap-2">
+      <Button
+        type="button"
+        variant="ghost"
+        disabled={pending || balance <= 0}
+        onClick={async () => {
+          if (ledger.mode === "demo") {
+            ledger.report("Demo mode does not create a Paystack charge. No money moves.", "err");
+            return;
+          }
+          setPending(true);
+          try {
+            const response = await fetch("/api/paystack/link", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ studentId }),
+            });
+            const body = (await response.json()) as { url?: string | null; error?: string; stub?: boolean };
+            if (!response.ok || body.stub || !body.url) {
+              setLink(null);
+              throw new Error(body.error || "Paystack did not create a link. Nothing was charged.");
+            }
+            setLink(body.url);
+            ledger.report("Mobile money link ready. Reminders can include it.");
+          } catch (error) {
+            ledger.report(error instanceof Error ? error.message : "The payment link was not created.", "err");
+          } finally {
+            setPending(false);
+          }
+        }}
+      >
+        {pending ? "Creating link…" : "Create MoMo payment link"}
+      </Button>
+      {link ? <p className="break-all rounded-xl bg-mint-50 p-3 text-sm">{link}</p> : <p className="text-sm text-ink-400">Without a Paystack test key this stays a stub and no money moves. A verified webhook records the payment once.</p>}
     </div>
   );
 }

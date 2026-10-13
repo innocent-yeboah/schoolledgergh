@@ -15,7 +15,8 @@ This repository replaces the original single-file `index.html` app. It does **no
 - Export payments, the message log, and the admin school list as CSV.
 - Edit WhatsApp reminder and receipt templates.
 - Open a personal `wa.me` chat, or email parents one at a time. An identical announcement uses BCC so parents do not see each other’s addresses.
-- Send SMS only from the server. The provider key is never stored on the school or in the browser. A message is logged as **sent** only after Hubtel or Arkesel accepts it.
+- Send a personal SMS to every owing parent. Arkesel is the default provider; Hubtel and mNotify are adapters on the same server route. The provider key stays in server environment variables. A message is logged as **sent** only after that provider accepts it.
+- Create a Paystack mobile-money link for a student's balance and include it in the reminder. The webhook checks the Paystack signature, verifies the charge, and records the payment once. Without keys, both SMS and Paystack stay stubs and no money moves.
 - Platform admins list every school through a server route that uses the secret key. The public anon key cannot read another school’s rows.
 
 ## Stack
@@ -54,11 +55,14 @@ This repository replaces the original single-file `index.html` app. It does **no
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Browser | New publishable key. `NEXT_PUBLIC_SUPABASE_ANON_KEY` is also accepted |
 | `SUPABASE_SECRET_KEY` | Server only | New secret key. `SUPABASE_SERVICE_ROLE_KEY` is also accepted. Required for admin lists and for recording SMS as sent |
 | `ADMIN_EMAILS` | Server only | Comma-separated platform admin emails |
-| `SMS_PROVIDER` | Server only | `hubtel` or `arkesel` |
-| `SMS_API_KEY` | Server only | Provider secret. Never put this in `NEXT_PUBLIC_` |
-| `SMS_CLIENT_ID` | Server only | Hubtel client id |
-| `SMS_SENDER_ID` | Server only | Sender name, default `SchoolGH` |
-| `SMS_LIVE` | Server only | Must be `true` before any SMS is attempted |
+| `SMS_PROVIDER` | Server only | `arkesel` (default), `hubtel`, or `mnotify` |
+| `SMS_API_KEY` | Server only | Provider secret. Never put this in `NEXT_PUBLIC_` and never store it on a school |
+| `SMS_CLIENT_ID` | Server only | Hubtel client id. Required only for Hubtel |
+| `SMS_SENDER_ID` | Server only | Sender name, default `SchoolGH` (11 characters max) |
+| `SMS_LIVE` | Server only | Must be `true` before any SMS is attempted. Otherwise the route is a stub and nothing is logged as sent |
+| `PAYSTACK_SECRET_KEY` | Server only | `sk_test_...` for test mode. `sk_live_...` is ignored unless `PAYSTACK_LIVE=true` |
+| `PAYSTACK_PUBLIC_KEY` | Server only | Optional `pk_test_...` key. Not used to create links, and it is not the secret |
+| `PAYSTACK_LIVE` | Server only | Must be `true` before an `sk_live_` secret can charge or record |
 | `NEXT_PUBLIC_SUPPORT_WHATSAPP` | Browser | Support number, digits only |
 | `NEXT_PUBLIC_SUPPORT_EMAIL` | Browser | Support inbox for tickets |
 
@@ -78,7 +82,9 @@ The schema and policies live in:
 
 `supabase/migrations/20261012164751_school_ledger_schema.sql`
 
-The file creates `profiles`, `schools`, `students`, `payments`, `feeding_marks`, and `message_log`. It enables and forces row level security. Authenticated users can touch only the school tied to their login. `anon` has no table grants and no policies. `student_fee_status` is a `security_invoker` view: paid amount and balance are `term_fee` minus the sum of payments. There is no `paid` column to overwrite, and there is no SMS key column.
+`supabase/migrations/20261012201035_paystack_payment_links.sql`
+
+The first file creates `profiles`, `schools`, `students`, `payments`, `feeding_marks`, and `message_log`. The second adds `payment_links` for Paystack checkouts. Apply both, in that order. Both enable and force row level security. Authenticated users can touch only the school tied to their login. `anon` has no table grants and no policies. `student_fee_status` is a `security_invoker` view: paid amount and balance are `term_fee` minus the sum of payments. There is no `paid` column to overwrite, and there is no SMS or Paystack key column.
 
 Apply it to a new project in either of these ways:
 
@@ -89,7 +95,13 @@ Linking and pushing are manual steps. This repo does not run them.
 
 If the old production tables already exist, `CREATE TABLE` fails immediately. The migration has no `DROP` and no `DELETE`, but it is still the wrong script for the live database. Moving the old rows across needs a separate, reviewed data migration. That work is not done here.
 
-The SQL is checked locally with PGlite (`npm test`). That test creates two schools and asserts that one cannot read the other, that anon cannot read schools, that a balance comes from payments, and that a browser role cannot insert `status = 'sent'`.
+The SQL is checked locally with PGlite (`npm test`). That test creates two schools and asserts that one cannot read the other, that anon cannot read schools, that a balance comes from payments, that a browser role cannot insert `status = 'sent'`, and that a browser role cannot mark a Paystack link paid.
+
+### SMS reminders
+
+`POST /api/sms/send` with `{ "audience": "owing", "message": "Dear {parent_name}, {student_name} owes GH₵{balance}. Pay: {payment_link}" }` texts each owing parent a different balance. `{payment_link}` is that student's Paystack checkout when test keys are set, and the words `MoMo link unavailable` when they are not. Delivery is `sent` or `failed` on `message_log`. A missing key or `SMS_LIVE` other than `true` does not call the provider and does not write `sent`.
+
+Set the Paystack webhook to `https://YOUR_DOMAIN/api/paystack/webhook`. The route reads the raw body, checks `x-paystack-signature` (HMAC SHA512 with `PAYSTACK_SECRET_KEY`), then calls Paystack verify. The same reference records one payment. A second delivery of that event does not add another row.
 
 ## PWA and Android later
 
@@ -111,11 +123,10 @@ Chrome can install the app when it is served over HTTPS (or localhost), the mani
 
 ## Still to do
 
-- Scheduled fee reminders.
-- MoMo and Paystack collection. Payments can store a transaction id, but money is not collected in the app.
+- Scheduled fee reminders. Owing parents can be texted now, but nothing sends on a clock.
 - PDF or printable receipts. The receipt is an on-screen preview plus WhatsApp.
 - A real mailbox for bulk email. Parents are contacted through the device mail app, with BCC or one message each.
-- Turning on live SMS with Hubtel or Arkesel credentials (`SMS_LIVE=true`).
+- Handset delivery reports from the SMS provider. `sent` means the provider accepted the message.
 - The Capacitor Android project.
 - A data migration from the original production tables, if those rows should move.
 - Staff roles inside one school, and stored support tickets.

@@ -30,6 +30,50 @@ describe("SMS adapter", () => {
     expect(fetchImpl).toHaveBeenCalledOnce();
   });
 
+  it("uses Arkesel when no provider is set", async () => {
+    const fetchImpl = vi.fn(async (url: string) => {
+      expect(url).toContain("arkesel.com");
+      expect(url).not.toContain("secret-key");
+      return new Response(JSON.stringify({ data: [{ id: "ark-1" }] }), { status: 200 });
+    });
+    const result = await sendSms(
+      { to: "233244123456", message: "Hi", senderId: "SchoolGH" },
+      { SMS_API_KEY: "secret-key", SMS_LIVE: "true" },
+      fetchImpl,
+    );
+    expect(result).toEqual({ ok: true, attempted: true, providerMessageId: "ark-1" });
+  });
+
+  it("logs mNotify as sent only when the provider accepts the message", async () => {
+    const fetchImpl = vi.fn(async (url: string, init?: RequestInit) => {
+      expect(url.startsWith("https://api.mnotify.com/api/sms/quick?key=")).toBe(true);
+      expect(url).toContain(encodeURIComponent("mnotify-secret"));
+      const payload = JSON.parse(String(init?.body));
+      expect(payload.recipient).toEqual(["233244123456"]);
+      expect(payload.message).toContain("GH₵20.00");
+      return new Response(JSON.stringify({ status: "success", code: "2000", message: "messages sent successfully", summary: { _id: "camp-1" } }), { status: 200 });
+    });
+    const result = await sendSms(
+      { to: "233244123456", message: "Ama owes GH₵20.00", senderId: "SchoolGH" },
+      { SMS_PROVIDER: "mnotify", SMS_API_KEY: "mnotify-secret", SMS_LIVE: "true" },
+      fetchImpl,
+    );
+    expect(result).toEqual({ ok: true, attempted: true, providerMessageId: "camp-1" });
+    expect(JSON.stringify(result)).not.toContain("mnotify-secret");
+  });
+
+  it("does not mark a rejected mNotify response as sent", async () => {
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ status: "error", code: "1004", message: "sender id not approved" }), { status: 200 }));
+    const result = await sendSms(
+      { to: "233244123456", message: "Hi", senderId: "SchoolGH" },
+      { SMS_PROVIDER: "mnotify", SMS_API_KEY: "mnotify-secret", SMS_LIVE: "true" },
+      fetchImpl,
+    );
+    expect(result).toEqual({ ok: false, attempted: true, error: "sender id not approved" });
+    if (result.ok) throw new Error("mNotify rejection was treated as sent.");
+    expect(result.error).not.toContain("mnotify-secret");
+  });
+
   it("reports a provider failure as not sent", async () => {
     const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ message: "rejected" }), { status: 400 }));
     const result = await sendSms(

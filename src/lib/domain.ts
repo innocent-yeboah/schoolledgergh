@@ -52,6 +52,7 @@ export const PAYMENT_METHODS = [
   "AirtelTigo",
   "Bank Transfer",
   "Cheque",
+  "Paystack Mobile Money",
 ] as const;
 
 export const DEFAULT_TPL_PAYMENT = `Dear {parent_name},
@@ -74,7 +75,7 @@ Fee reminder for {term} ({academic_year}).
 Student: {student_name} ({student_id})
 Balance: GH₵{balance}
 
-Please pay at school or by mobile money.
+Please pay at school or by mobile money: {payment_link}
 Help: {school_phone}
 
 — {school_name}`;
@@ -93,6 +94,7 @@ export const TEMPLATE_VARIABLES = [
   "{academic_year}",
   "{school_name}",
   "{school_phone}",
+  "{payment_link}",
 ];
 
 export function defaultClassFees(): Record<string, number> {
@@ -236,16 +238,25 @@ export function paymentTemplateVars(input: {
   };
 }
 
-export function reminderVars(school: SchoolProfile, student: StudentView): Record<string, string> {
-  return paymentTemplateVars({
-    school,
-    student,
-    amount: 0,
-    method: "",
-    paidOnLabel: "",
-    txnId: "",
-    balanceAfter: student.balance,
-  });
+export const PAYMENT_LINK_PLACEHOLDER = "MoMo link unavailable";
+
+export function reminderVars(
+  school: SchoolProfile,
+  student: StudentView,
+  paymentLink = student.balance > 0.001 ? PAYMENT_LINK_PLACEHOLDER : "No balance due.",
+): Record<string, string> {
+  return {
+    ...paymentTemplateVars({
+      school,
+      student,
+      amount: 0,
+      method: "",
+      paidOnLabel: "",
+      txnId: "",
+      balanceAfter: student.balance,
+    }),
+    payment_link: paymentLink,
+  };
 }
 
 function comparePayments(a: PaymentRecord, b: PaymentRecord): number {

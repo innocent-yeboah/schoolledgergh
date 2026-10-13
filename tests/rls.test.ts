@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
 import { describe, expect, it } from "vitest";
 
@@ -32,9 +32,12 @@ grant execute on function auth.uid() to anon, authenticated;
 describe("school ledger RLS", () => {
   it("isolates schools, derives balances, and blocks anon and forged sent logs", async () => {
     const db = new PGlite();
-    const migration = readFileSync(new URL("../supabase/migrations/20261012164751_school_ledger_schema.sql", import.meta.url), "utf8");
+    const migrationDir = new URL("../supabase/migrations/", import.meta.url);
+    const migrations = readdirSync(migrationDir).filter((name) => name.endsWith(".sql")).sort();
     await db.exec(preamble);
-    await db.exec(migration);
+    for (const name of migrations) {
+      await db.exec(readFileSync(new URL(name, migrationDir), "utf8"));
+    }
 
     const paid = await db.query<{ count: string }>(
       "select count(*)::text as count from information_schema.columns where table_schema = 'public' and table_name = 'students' and column_name = 'paid'",
@@ -129,7 +132,27 @@ describe("school ledger RLS", () => {
       await db.exec(`update public.profiles set is_platform_admin = true where id = '${USER_A}'`);
       const flag = await db.query<{ is_platform_admin: boolean }>(`select is_platform_admin from public.profiles where id = '${USER_A}'`);
       expect(flag.rows[0].is_platform_admin).toBe(false);
+      await db.exec(`
+        insert into public.payment_links (school_id, user_id, student_id, reference, amount, authorization_url, status)
+        values ('${schoolA}', '${USER_A}', 'S1', 'slgh.test.one', 10, 'https://checkout.paystack.com/test', 'pending');
+      `);
+      await expect(
+        db.exec(`
+          insert into public.payment_links (school_id, user_id, student_id, reference, amount, authorization_url, status)
+          values ('${schoolA}', '${USER_A}', 'S1', 'slgh.test.paid', 10, 'https://checkout.paystack.com/paid', 'paid');
+        `),
+      ).rejects.toThrow(/marked paid only by the server/);
     });
+
+    await asUser(db, USER_B, async () => {
+      const links = await db.query("select reference from public.payment_links");
+      expect(links.rows).toEqual([]);
+    });
+
+    await db.exec("reset role");
+    await db.exec("set role anon");
+    await expect(db.query("select * from public.payment_links")).rejects.toThrow();
+    await db.exec("reset role");
 
     await db.close();
   });
