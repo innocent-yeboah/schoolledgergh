@@ -65,6 +65,12 @@ This repository replaces the original single-file `index.html` app. It does **no
 | `PAYSTACK_LIVE` | Server only | Must be `true` before an `sk_live_` secret can charge or record |
 | `NEXT_PUBLIC_SUPPORT_WHATSAPP` | Browser | Support number, digits only |
 | `NEXT_PUBLIC_SUPPORT_EMAIL` | Browser | Support inbox for tickets |
+| `NEXT_PUBLIC_SENTRY_DSN` | Browser, inlined at build | Public Sentry DSN for the EU project `schoolledgergh` |
+| `SENTRY_DSN` | Server and edge | Same public DSN. The server reads this, then `NEXT_PUBLIC_SENTRY_DSN` |
+| `SENTRY_ORG` | Build | `build-with-innocent` |
+| `SENTRY_PROJECT` | Build | `schoolledgergh` |
+| `SENTRY_AUTH_TOKEN` | Build only | Secret token for source map upload. Never commit it and never prefix it with `NEXT_PUBLIC_` |
+| `SENTRY_URL` | Build | Optional. `https://de.sentry.io` when a personal token must target the EU host. Leave unset for an organization token |
 
 To grant admin without putting an email in `ADMIN_EMAILS`, run this in the SQL editor of the **new** project as the database owner. Do not store the flag in user metadata; users can edit that.
 
@@ -75,6 +81,12 @@ where id = (select id from auth.users where email = 'you@school.edu.gh');
 ```
 
 A normal school login cannot set `is_platform_admin` itself.
+
+## Error tracking
+
+Sentry is initialized for the browser, the Node server, and the edge runtime. Events go to the EU ingest host in the DSN. Names, phone numbers, emails, cookies, headers, request bodies, query strings, and local variables are not collected. Session replay is off.
+
+Source maps upload during `next build` only when `SENTRY_AUTH_TOKEN` is set, using `SENTRY_ORG` and `SENTRY_PROJECT`. Without the token the build still succeeds and skips the upload. Client source maps are deleted after a successful upload.
 
 ## Database migration
 
