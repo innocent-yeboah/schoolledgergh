@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { summarizeSchools, type SchoolRow } from "@/lib/admin/summary";
-import { platformAccess } from "@/lib/auth/platform-admin";
+import { requirePlatformAdmin } from "@/lib/auth/require-admin";
 import { defaultClassFees, DEFAULT_FEEDING_FEE, DEFAULT_TPL_PAYMENT, DEFAULT_TPL_REMINDER } from "@/lib/domain";
 import { createServiceClient } from "@/lib/supabase/admin";
 
@@ -76,9 +76,8 @@ export async function POST(request: Request) {
 }
 
 async function requireAdmin() {
-  const access = await platformAccess();
-  if (!access.signedIn) return NextResponse.json({ error: "Sign in required." }, { status: 401 });
-  if (!access.admin) return NextResponse.json({ error: "This account is not a platform admin." }, { status: 403 });
+  const access = await requirePlatformAdmin();
+  if (access instanceof NextResponse) return access;
   const service = createServiceClient();
   if (!service) {
     return NextResponse.json(

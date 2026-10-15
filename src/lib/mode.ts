@@ -1,19 +1,38 @@
 export type AppMode = "demo-school" | "demo-admin" | "live";
 
-export function readAppMode(): AppMode {
-  if (typeof document === "undefined") return "live";
-  const match = document.cookie.match(/(?:^|;\s*)slgh_mode=([^;]*)/);
-  if (match?.[1] === "school") return "demo-school";
-  if (match?.[1] === "admin") return "demo-admin";
+const DEMO_COOKIE = "slgh_mode";
+
+export function demoModeEnabled(flag: string | undefined = process.env.NEXT_PUBLIC_DEMO_MODE): boolean {
+  return flag === "true";
+}
+
+export function activeDemoCookie(value: string | undefined, enabled = demoModeEnabled()): "" | "school" | "admin" {
+  if (!enabled) return "";
+  if (value === "school" || value === "admin") return value;
+  return "";
+}
+
+export function appModeFromCookie(value: string | undefined, enabled = demoModeEnabled()): AppMode {
+  const demo = activeDemoCookie(value, enabled);
+  if (demo === "school") return "demo-school";
+  if (demo === "admin") return "demo-admin";
   return "live";
 }
 
+export function demoModeCookie(mode: "school" | "admin" | null, enabled = demoModeEnabled()): string {
+  if (mode && enabled) return `${DEMO_COOKIE}=${mode}; Path=/; Max-Age=2592000; SameSite=Lax`;
+  return `${DEMO_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax`;
+}
+
+export function readAppMode(): AppMode {
+  if (typeof document === "undefined") return "live";
+  const match = document.cookie.match(new RegExp(`(?:^|;\\s*)${DEMO_COOKIE}=([^;]*)`));
+  return appModeFromCookie(match?.[1]);
+}
+
 export function writeAppMode(mode: "school" | "admin" | null): void {
-  if (mode) {
-    document.cookie = `slgh_mode=${mode}; Path=/; Max-Age=2592000; SameSite=Lax`;
-    return;
-  }
-  document.cookie = "slgh_mode=; Path=/; Max-Age=0; SameSite=Lax";
+  if (typeof document === "undefined") return;
+  document.cookie = demoModeCookie(mode);
 }
 
 const PENDING_KEY = "slgh.pending-school.v1";

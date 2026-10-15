@@ -3,8 +3,9 @@ export function decideRedirect(input: {
   demo: string;
   signedIn: boolean;
   supabaseConfigured: boolean;
+  admin?: boolean;
 }): string | null {
-  const { pathname, demo, signedIn } = input;
+  const { pathname, demo, signedIn, admin = false } = input;
   if (pathname.startsWith("/api") || pathname.startsWith("/auth")) return null;
 
   if (pathname === "/") {
@@ -17,6 +18,7 @@ export function decideRedirect(input: {
   if (pathname.startsWith("/admin")) {
     if (demo === "school") return "/app";
     if (!signedIn && demo !== "admin") return "/login";
+    if (signedIn && !admin) return "/app";
     return null;
   }
 

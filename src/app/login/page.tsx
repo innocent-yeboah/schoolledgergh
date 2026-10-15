@@ -5,13 +5,14 @@ import { useRouter } from "next/navigation";
 import { PwaRegister } from "@/components/pwa";
 import { Button, Field, TextInput } from "@/components/ui";
 import { suggestedAcademicPeriod } from "@/lib/academic";
-import { savePendingSchool, writeAppMode } from "@/lib/mode";
+import { demoModeEnabled, savePendingSchool, writeAppMode } from "@/lib/mode";
 import { createClient } from "@/lib/supabase/client";
 import { publicSupabaseConfig, supportWhatsApp } from "@/lib/supabase/env";
 
 export default function LoginPage() {
   const router = useRouter();
   const configured = Boolean(publicSupabaseConfig());
+  const demoEnabled = demoModeEnabled();
   const suggested = useMemo(() => suggestedAcademicPeriod(new Date()), []);
   const [tab, setTab] = useState<"login" | "register">("login");
   const [error, setError] = useState("");
@@ -48,7 +49,8 @@ export default function LoginPage() {
         </div>
         {error ? <p className="mb-3 rounded-xl bg-clay-100 px-3 py-3 text-sm text-clay-700" role="alert">{error}</p> : null}
         {notice ? <p className="mb-3 rounded-xl bg-mint-100 px-3 py-3 text-sm text-forest-900">{notice}</p> : null}
-        {!configured ? <p className="mb-3 rounded-xl bg-gold-100 px-3 py-3 text-sm">Live sign-in needs Supabase environment variables. Demo mode works without them.</p> : null}
+        {!configured && demoEnabled ? <p className="mb-3 rounded-xl bg-gold-100 px-3 py-3 text-sm">Live sign-in needs Supabase environment variables. Demo mode works without them.</p> : null}
+        {!configured && !demoEnabled ? <p className="mb-3 rounded-xl bg-gold-100 px-3 py-3 text-sm">Live sign-in needs Supabase environment variables.</p> : null}
         {tab === "login" ? (
           <form
             onSubmit={async (event) => {
@@ -153,10 +155,12 @@ export default function LoginPage() {
             <Button type="submit" className="w-full" disabled={pending}>{pending ? "Creating…" : "Create school account"}</Button>
           </form>
         )}
-        <div className="mt-4 grid gap-2">
-          <Button type="button" variant="ghost" onClick={() => enterDemo("school")}>Try the school demo</Button>
-          <Button type="button" variant="ghost" onClick={() => enterDemo("admin")}>Try the admin demo</Button>
-        </div>
+        {demoEnabled ? (
+          <div className="mt-4 grid gap-2">
+            <Button type="button" variant="ghost" onClick={() => enterDemo("school")}>Try the school demo</Button>
+            <Button type="button" variant="ghost" onClick={() => enterDemo("admin")}>Try the admin demo</Button>
+          </div>
+        ) : null}
         <p className="mt-4 text-center text-sm text-ink-400">
           Need help? <a className="font-semibold text-forest-800" href={`https://wa.me/${supportWhatsApp()}`}>WhatsApp support</a>
         </p>
