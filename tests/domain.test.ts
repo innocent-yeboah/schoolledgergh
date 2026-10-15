@@ -6,6 +6,7 @@ import { csvCell, toCsv } from "@/lib/csv";
 import {
   buildStudentViews,
   feeStatus,
+  fillTemplate,
   validatePayment,
 } from "@/lib/domain";
 import { bulkBccMailto, individualMailto } from "@/lib/email/mailto";
@@ -44,6 +45,16 @@ describe("balances", () => {
     expect(views[0]).toMatchObject({ paid: 150, balance: 200, status: "partial" });
     expect(feeStatus(350, 0)).toBe("owing");
     expect(feeStatus(350, 350)).toBe("paid");
+  });
+
+  it("fills a reminder template from the student balance", () => {
+    const message = fillTemplate("Dear {parent_name}, {student_name} owes GH₵{balance} for {term}.", {
+      parent_name: "Yaa Owusu",
+      student_name: "Ama Owusu",
+      balance: "200.00",
+      term: "Term 1",
+    });
+    expect(message).toBe("Dear Yaa Owusu, Ama Owusu owes GH₵200.00 for Term 1.");
   });
 
   it("rejects a payment above the derived balance", () => {

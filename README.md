@@ -51,6 +51,8 @@ This repository replaces the original single-file `index.html` app. It does **no
 
 | Name | Where | Purpose |
 | --- | --- | --- |
+| `APP_ENV` | Server | `development`, `staging`, or `production`. Unset means development |
+| `NEXT_PUBLIC_APP_ENV` | Browser, inlined at build | Same three values. Must match `APP_ENV` when both are set. `staging` shows a banner |
 | `NEXT_PUBLIC_SUPABASE_URL` | Browser and server | Project URL |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Browser | New publishable key. `NEXT_PUBLIC_SUPABASE_ANON_KEY` is also accepted |
 | `SUPABASE_SECRET_KEY` | Server only | New secret key. `SUPABASE_SERVICE_ROLE_KEY` is also accepted. Required for admin lists and for recording SMS as sent |
@@ -88,6 +90,45 @@ Sentry is initialized for the browser, the Node server, and the edge runtime. Ev
 
 Source maps upload during `next build` only when `SENTRY_AUTH_TOKEN` is set, using `SENTRY_ORG` and `SENTRY_PROJECT`. Without the token the build still succeeds and skips the upload. Client source maps are deleted after a successful upload.
 
+## Environments
+
+Staging and production are different Supabase projects and different Vercel environment variable sets. The migrations in `supabase/migrations` are the only schema source of truth. Change the schema by adding a migration file, apply that file to staging, and only then apply the same file to production. Do not treat dashboard edits as the schema.
+
+`APP_ENV` and `NEXT_PUBLIC_APP_ENV` are `development`, `staging`, or `production`. When both are unset, the app runs as development. When both are set, they must be the same value. Any other value stops the server from rendering. A staging deploy built with `NEXT_PUBLIC_APP_ENV=staging` shows: “Staging. This is not the production database.”
+
+### Staging Supabase project
+
+1. Create a new Supabase project for staging. Do not reuse the production project ref.
+2. Put that project's URL and keys in the Vercel Preview environment, or in a dedicated Staging environment. Set `APP_ENV=staging` and `NEXT_PUBLIC_APP_ENV=staging` there. Production keys stay on the Vercel Production environment with `APP_ENV=production`.
+3. From a checkout of this repo, link only the staging project and push the migrations:
+
+   ```bash
+   npx supabase link --project-ref YOUR_STAGING_PROJECT_REF
+   npx supabase db push
+   ```
+
+   Read the linked ref before `db push`. These commands are manual. This repo does not run them, and this runbook never links the live production project.
+
+### Backup and restore
+
+Back up the staging database, or download a backup you already took from the Supabase dashboard. Restore into an empty staging database. Do not point either URL at production.
+
+1. Dump staging. `STAGING_DATABASE_URL` is the Postgres URI from the staging project's database settings. Keep it out of git.
+
+   ```bash
+   npx supabase db dump --db-url "$STAGING_DATABASE_URL" -f backup.sql
+   ```
+
+2. Restore into an empty database (a new staging project, or a local Postgres):
+
+   ```bash
+   psql "$RESTORE_DATABASE_URL" -f backup.sql
+   ```
+
+3. Point the staging deploy at the restored project: that project's URL and keys, with `APP_ENV=staging` and `NEXT_PUBLIC_APP_ENV=staging`.
+
+Paid Supabase plans also keep point-in-time recovery under Dashboard → Database → Backups. Restoring that backup creates a new project. Copy the new project's keys into the staging environment. Leave the production URL alone.
+
 ## Database migration
 
 The schema and policies live in:
@@ -98,7 +139,7 @@ The schema and policies live in:
 
 The first file creates `profiles`, `schools`, `students`, `payments`, `feeding_marks`, and `message_log`. The second adds `payment_links` for Paystack checkouts. Apply both, in that order. Both enable and force row level security. Authenticated users can touch only the school tied to their login. `anon` has no table grants and no policies. `student_fee_status` is a `security_invoker` view: paid amount and balance are `term_fee` minus the sum of payments. There is no `paid` column to overwrite, and there is no SMS or Paystack key column.
 
-Apply it to a new project in either of these ways:
+Apply both files to a new staging or production project in either of these ways:
 
 - Supabase Dashboard → SQL Editor → paste the migration → Run.
 - Or, after `supabase link --project-ref YOUR_NEW_PROJECT_REF`, run `supabase db push`.
@@ -123,19 +164,42 @@ Chrome can install the app when it is served over HTTPS (or localhost), the mani
 
 `capacitor.config.example.ts` shows a later Android wrapper. Point `server.url` at the deployed Next.js site so the admin and SMS routes keep working. A static export would not serve those routes.
 
+## Continuous integration
+
+`.github/workflows/ci.yml` runs on every pull request and on pushes to `main`:
+
+1. `npm ci`
+2. `npm run typecheck`
+3. `npm run lint`
+4. `npm test` — Vitest, including balance calculation, reminder templating, and the Paystack webhook
+5. Playwright Chromium
+6. `npm run build`
+7. `npm run check:secrets` — fails if client source reads a server secret or mentions `sb_secret_`, `sk_live_`, or `sk_test_`, and if the built client bundle contains those prefixes followed by key material or a `NEXT_PUBLIC_` alias of a server secret. The Supabase browser client’s own `sb_secret_` prefix guard is allowed
+8. `npm run test:e2e` — Playwright smoke: the sign-in screen, the school demo, adding a student, and recording a payment
+
+The smoke tests use demo mode, so CI has no Supabase credentials and does not touch a database.
+
+Dependabot (`.github/dependabot.yml`) opens weekly pull requests for npm and GitHub Actions. CodeQL (`.github/workflows/codeql.yml`) analyzes JavaScript and TypeScript on pull requests. JavaScript does not need a CodeQL build step.
+
+## Security headers
+
+`next.config.ts` sends a Content-Security-Policy plus `nosniff`, a strict referrer policy, a locked-down Permissions-Policy, `X-Frame-Options: DENY`, and HSTS. The policy allows this origin, Supabase (`https://*.supabase.co` and the matching websocket), and Sentry ingest. Scripts and styles allow inline tags because the App Router and the error page emit them. `unsafe-eval` is added only when `NODE_ENV` is not production, so local dev can run and the production build stays without it. HSTS is ignored by browsers on plain HTTP, including the local Playwright server.
+
 ## Scripts
 
 | Command | What it does |
 | --- | --- |
 | `npm run dev` | Local app |
-| `npm test` | Domain rules, SMS logging, and RLS |
+| `npm test` | Domain rules, SMS logging, Paystack webhook, RLS, and Sentry privacy |
+| `npm run test:e2e` | Playwright smoke against `npm start` |
+| `npm run check:secrets` | Scan the client bundle and client source for secrets |
 | `npm run lint` | ESLint |
 | `npm run typecheck` | TypeScript |
 | `npm run build` | Production build |
 
 ## Still to do
 
-- Scheduled fee reminders. Owing parents can be texted now, but nothing sends on a clock.
+- Scheduled fee reminders. Owing parents can be texted now, but nothing sends on a clock. Build that later as config, not code: one reminder workflow driven by a per-school settings row. The row stores trigger timing relative to the due date, the nudge count, escalation rules as JSONB, the message templates, and channel flags for SMS, WhatsApp, and email. Every school inherits the same defaults and can toggle them. Do not add a separate code path per school. The table is not in the schema yet. The next migration that introduces reminders should add it (one row per school) and should leave `schools.tpl_reminder` as the manual template.
 - PDF or printable receipts. The receipt is an on-screen preview plus WhatsApp.
 - A real mailbox for bulk email. Parents are contacted through the device mail app, with BCC or one message each.
 - Handset delivery reports from the SMS provider. `sent` means the provider accepted the message.

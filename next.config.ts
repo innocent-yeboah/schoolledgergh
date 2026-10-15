@@ -1,9 +1,14 @@
 import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs/config";
+import { securityHeaders } from "./src/lib/security/headers";
 
 const nextConfig: NextConfig = {
   async headers() {
     return [
+      {
+        source: "/:path*",
+        headers: securityHeaders(),
+      },
       {
         source: "/sw.js",
         headers: [
