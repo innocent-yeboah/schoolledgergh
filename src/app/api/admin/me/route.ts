@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { platformAccess } from "@/lib/auth/platform-admin";
+import { requirePlatformAdmin } from "@/lib/auth/require-admin";
 
 export async function GET() {
-  const access = await platformAccess();
-  if (!access.signedIn) return NextResponse.json({ admin: false, serviceConfigured: access.serviceConfigured }, { status: 401 });
+  const access = await requirePlatformAdmin();
+  if (access instanceof NextResponse) return access;
   return NextResponse.json({
-    admin: access.admin,
+    admin: true,
     serviceConfigured: access.serviceConfigured,
     email: access.email,
     error: access.error ?? null,

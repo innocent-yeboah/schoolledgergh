@@ -1,36 +1,17 @@
 import { expect, test } from "@playwright/test";
 
-test("login, add a student, and record a payment in the school demo", async ({ page }) => {
-  await page.goto("/login");
+test("opening the app shows login and not the demo school", async ({ page }) => {
+  await page.goto("/");
+  await expect(page).toHaveURL(/\/login\/?$/);
   await expect(page.getByRole("heading", { name: "SchoolLedger GH" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Sign in" })).toHaveCount(2);
-  await expect(page.getByText("Demo mode works without them.")).toBeVisible();
+  await expect(page.getByText("Bright Future Academy")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Try the school demo" })).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Try the school demo" }).click();
-  await expect(page).toHaveURL(/\/app\/?$/);
-  await expect(page.getByRole("banner").getByText("Bright Future Academy")).toBeVisible();
-  await expect(page.getByText("Demo", { exact: true })).toBeVisible();
-
-  await page.getByRole("link", { name: "Students" }).click();
-  await expect(page).toHaveURL(/\/app\/students/);
-  await page.getByRole("button", { name: "Add student" }).click();
-  const dialog = page.getByRole("dialog", { name: "Add student" });
-  await dialog.getByLabel("First name").fill("Ama");
-  await dialog.getByLabel("Last name").fill("Serwaa");
-  await dialog.getByLabel("Parent or guardian").fill("Akua Serwaa");
-  await dialog.getByLabel("Parent phone").fill("0244000000");
-  await dialog.getByRole("button", { name: "Add student" }).click();
-
-  const card = page.locator("article").filter({ hasText: "Ama Serwaa" });
-  await expect(card).toBeVisible();
-  await card.getByRole("link", { name: "Record payment" }).click();
-  await expect(page).toHaveURL(/\/app\/fees\?student=/);
-  await page.getByLabel("Amount (GH₵)").fill("50");
-  await page.getByRole("button", { name: "Record payment" }).click();
-
-  const receipt = page.getByRole("dialog", { name: "Payment recorded" });
-  await expect(receipt).toBeVisible();
-  await expect(receipt.getByText("Balance now")).toContainText("200.00");
+  await page.context().addCookies([{ name: "slgh_mode", value: "school", url: "http://127.0.0.1:3000" }]);
+  await page.goto("/app");
+  await expect(page).toHaveURL(/\/login\/?$/);
+  await expect(page.getByText("Bright Future Academy")).toHaveCount(0);
 });
 
 test("responses send security headers", async ({ request }) => {

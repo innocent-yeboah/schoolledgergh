@@ -39,7 +39,7 @@ This repository replaces the original single-file `index.html` app. It does **no
    npm run dev
    ```
 
-2. Copy `.env.example` to `.env.local` and fill in a **new** Supabase project. Leave the variables empty if you only want demo mode.
+2. Copy `.env.example` to `.env.local` and fill in a **new** Supabase project. Set `NEXT_PUBLIC_DEMO_MODE=true` when you want the sample school on this machine. Leave that variable unset in production.
 
 3. Apply the migration in `supabase/migrations` to that new project (see below). Do not run it against the existing production database.
 
@@ -51,6 +51,7 @@ This repository replaces the original single-file `index.html` app. It does **no
 
 | Name | Where | Purpose |
 | --- | --- | --- |
+| `NEXT_PUBLIC_DEMO_MODE` | Browser, inlined at build | `true` shows the demo buttons and honors a demo cookie. Unset or any other value keeps demo mode off |
 | `APP_ENV` | Server | `development`, `staging`, or `production`. Unset means development |
 | `NEXT_PUBLIC_APP_ENV` | Browser, inlined at build | Same three values. Must match `APP_ENV` when both are set. `staging` shows a banner |
 | `NEXT_PUBLIC_SUPABASE_URL` | Browser and server | Project URL |

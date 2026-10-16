@@ -103,6 +103,10 @@ describe("routing", () => {
     expect(decideRedirect({ pathname: "/", demo: "school", signedIn: false, supabaseConfigured: false })).toBe("/app");
     expect(decideRedirect({ pathname: "/admin", demo: "school", signedIn: false, supabaseConfigured: true })).toBe("/app");
     expect(decideRedirect({ pathname: "/app", demo: "admin", signedIn: false, supabaseConfigured: true })).toBe("/admin");
+    expect(decideRedirect({ pathname: "/admin", demo: "", signedIn: true, supabaseConfigured: true })).toBe("/app");
+    expect(decideRedirect({ pathname: "/admin/schools", demo: "", signedIn: true, supabaseConfigured: true, admin: false })).toBe("/app");
+    expect(decideRedirect({ pathname: "/admin", demo: "admin", signedIn: true, supabaseConfigured: true, admin: false })).toBe("/app");
+    expect(decideRedirect({ pathname: "/admin", demo: "", signedIn: true, supabaseConfigured: true, admin: true })).toBeNull();
     expect(decideRedirect({ pathname: "/app", demo: "", signedIn: true, supabaseConfigured: true })).toBeNull();
     expect(decideRedirect({ pathname: "/api/sms/send", demo: "", signedIn: false, supabaseConfigured: true })).toBeNull();
   });
