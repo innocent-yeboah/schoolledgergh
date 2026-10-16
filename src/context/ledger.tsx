@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { assertAcademicPeriod } from "@/lib/academic";
+import { passwordUpdatedFromSearch } from "@/lib/auth/password-reset";
 import { readLastLedgerCache, writeLedgerCache } from "@/lib/data/cache";
 import { LiveLedger } from "@/lib/data/live";
 import { DemoLedger } from "@/lib/demo/store";
@@ -67,6 +68,17 @@ export function LedgerProvider({ children }: { children: React.ReactNode }) {
     const timer = window.setTimeout(() => setNotice(null), 3200);
     return () => window.clearTimeout(timer);
   }, [notice]);
+
+  useEffect(() => {
+    const parsed = passwordUpdatedFromSearch(window.location.search);
+    if (!parsed.message) return;
+    const timer = window.setTimeout(() => {
+      notify(parsed.message ?? "");
+      const nextUrl = `${window.location.pathname}${parsed.nextSearch}${window.location.hash}`;
+      window.history.replaceState(null, "", nextUrl);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [notify]);
 
   useEffect(() => {
     const sync = () => setOffline(typeof navigator !== "undefined" && !navigator.onLine);

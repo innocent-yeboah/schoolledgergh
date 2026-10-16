@@ -43,7 +43,7 @@ This repository replaces the original single-file `index.html` app. It does **no
 
 3. Apply the migration in `supabase/migrations` to that new project (see below). Do not run it against the existing production database.
 
-4. In Supabase Auth, decide whether new schools must confirm email. The register screen handles both cases. If confirmation is on, add `https://YOUR_DOMAIN/auth/callback` to the redirect allow list.
+4. In Supabase Auth, decide whether new schools must confirm email. The register screen handles both cases. Add `https://YOUR_DOMAIN/auth/callback` to the redirect allow list. Password reset sends people to `https://YOUR_DOMAIN/auth/callback?next=/reset-password`, so allow that URL as well (or a wildcard such as `https://YOUR_DOMAIN/**`).
 
 5. Deploy on Vercel with the same environment variables. `NEXT_PUBLIC_*` values are public. Everything else must stay on the server.
 
