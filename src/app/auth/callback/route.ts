@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { emailOtpType } from "@/lib/auth/recovery-link";
 import { createClient } from "@/lib/supabase/server";
 
 const DEFAULT_NEXT = "/app";
@@ -20,17 +21,37 @@ function redirectTarget(origin: string, next: string | null): URL {
   }
 }
 
+function expiredLink(origin: string) {
+  return NextResponse.redirect(new URL("/login?error=link_expired", origin));
+}
+
 export async function GET(request: Request) {
   const url = new URL(request.url);
+  if (url.searchParams.has("error") || url.searchParams.has("error_description")) {
+    return expiredLink(url.origin);
+  }
+
   const code = url.searchParams.get("code");
-  if (code) {
-    const supabase = await createClient();
+  const tokenHash = url.searchParams.get("token_hash");
+  const type = emailOtpType(url.searchParams.get("type"));
+  if (!code && tokenHash && !type) return expiredLink(url.origin);
+
+  if (code || tokenHash) {
     try {
-      const { error } = await supabase.auth.exchangeCodeForSession(code);
-      if (error) return NextResponse.redirect(new URL("/login?error=link_expired", url.origin));
+      const supabase = await createClient();
+      if (code) {
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        if (error) return expiredLink(url.origin);
+      } else if (tokenHash && type) {
+        const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type });
+        if (error) return expiredLink(url.origin);
+      }
     } catch {
-      return NextResponse.redirect(new URL("/login?error=link_expired", url.origin));
+      return expiredLink(url.origin);
     }
   }
+
+  // Implicit recovery emails keep access_token in the hash. The browser
+  // carries that fragment across this same-origin redirect; the server never sees it.
   return NextResponse.redirect(redirectTarget(url.origin, url.searchParams.get("next")));
 }
