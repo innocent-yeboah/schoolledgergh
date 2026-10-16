@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type FormEvent, type InputHTMLAttributes, type KeyboardEvent, type ReactNode, type SelectHTMLAttributes } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useMemo, useRef, useState, type FormEvent, type InputHTMLAttributes, type KeyboardEvent, type ReactNode, type SelectHTMLAttributes } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { GyeNyame, KenteTexture, LineIcon, WhatsAppIcon, iconPath } from "@/components/login-art";
 import { PwaRegister } from "@/components/pwa";
 import { suggestedAcademicPeriod } from "@/lib/academic";
-import { friendlyAuth, sendPasswordReset } from "@/lib/auth/password-reset";
+import { friendlyAuth, loginErrorFromQuery, RESET_EMAIL_SENT, sendPasswordReset } from "@/lib/auth/password-reset";
 import { demoModeEnabled, savePendingSchool, writeAppMode } from "@/lib/mode";
 import { createClient } from "@/lib/supabase/client";
 import { publicSupabaseConfig, supportWhatsApp } from "@/lib/supabase/env";
@@ -52,6 +52,19 @@ const secondaryButton =
   focusRing;
 
 export default function LoginPage() {
+  return (
+    <Suspense fallback={<LoginScreen linkError="" />}>
+      <LoginWithSearch />
+    </Suspense>
+  );
+}
+
+function LoginWithSearch() {
+  const params = useSearchParams();
+  return <LoginScreen linkError={loginErrorFromQuery(params.get("error")) ?? ""} />;
+}
+
+function LoginScreen({ linkError }: { linkError: string }) {
   const router = useRouter();
   const configured = Boolean(publicSupabaseConfig());
   const demoEnabled = demoModeEnabled();
@@ -60,6 +73,7 @@ export default function LoginPage() {
   const [tab, setTab] = useState<Tab>("login");
   const [view, setView] = useState<View>("auth");
   const [error, setError] = useState("");
+  const [hideLinkError, setHideLinkError] = useState(false);
   const [notice, setNotice] = useState("");
   const [pending, setPending] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
@@ -80,6 +94,8 @@ export default function LoginPage() {
   const registerTabRef = useRef<HTMLButtonElement>(null);
   const focusId = useRef<string | null>(null);
 
+  const shownError = error || (hideLinkError ? "" : linkError);
+
   useEffect(() => {
     if (!focusId.current) return;
     const node = document.getElementById(focusId.current);
@@ -93,6 +109,7 @@ export default function LoginPage() {
 
   function clearStatus() {
     setError("");
+    setHideLinkError(true);
     setNotice("");
     setFieldErrors({});
   }
@@ -226,7 +243,7 @@ export default function LoginPage() {
     setPending(true);
     try {
       await sendPasswordReset(email, window.location.origin);
-      setNotice("Check your email for a reset link. Open it on this device. It brings you back to SchoolLedger.");
+      setNotice(RESET_EMAIL_SENT);
       focusSoon("form-notice");
     } catch (caught) {
       setError(caught instanceof Error ? friendlyAuth(caught.message) : "Could not send the reset email.");
@@ -300,9 +317,9 @@ export default function LoginPage() {
           <div className="rounded-2xl border border-forest-900/10 bg-white shadow-[0_24px_60px_-32px_rgba(7,66,31,0.55)]">
             <div className="h-1 rounded-t-2xl bg-gradient-to-r from-forest-900 via-gold-500 to-forest-900" aria-hidden="true" />
             <div className="p-4 sm:p-7">
-              {error ? (
+              {shownError ? (
                 <p id="form-error" tabIndex={-1} role="alert" className="mb-4 rounded-xl border border-clay-700/20 bg-clay-100 px-3 py-2.5 text-sm text-clay-700 outline-none">
-                  {error}
+                  {shownError}
                 </p>
               ) : null}
               {notice ? (
@@ -325,7 +342,7 @@ export default function LoginPage() {
                 <form onSubmit={onForgot} noValidate aria-busy={pending}>
                   <h2 className="font-display text-2xl font-semibold text-ink-900">Reset your password</h2>
                   <p className="mt-2 mb-5 text-sm leading-relaxed text-ink-700">
-                    Enter the email on the school account. We will send a link that returns here.
+                    Enter the email on the school account. We will send a link to set a new password.
                   </p>
                   <TextField
                     id="reset-email"
