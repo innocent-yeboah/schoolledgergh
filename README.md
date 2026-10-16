@@ -176,9 +176,9 @@ Chrome can install the app when it is served over HTTPS (or localhost), the mani
 5. Playwright Chromium
 6. `npm run build`
 7. `npm run check:secrets` — fails if client source reads a server secret or mentions `sb_secret_`, `sk_live_`, or `sk_test_`, and if the built client bundle contains those prefixes followed by key material or a `NEXT_PUBLIC_` alias of a server secret. The Supabase browser client’s own `sb_secret_` prefix guard is allowed
-8. `npm run test:e2e` — Playwright smoke: the sign-in screen, the school demo, adding a student, and recording a payment
+8. `npm run test:e2e` — Playwright smoke: the sign-in and registration screen, password reset, and security headers
 
-The smoke tests use demo mode, so CI has no Supabase credentials and does not touch a database.
+The smoke tests do not sign in to Supabase and do not touch a database. Demo buttons stay hidden unless `NEXT_PUBLIC_DEMO_MODE=true`.
 
 Dependabot (`.github/dependabot.yml`) opens weekly pull requests for npm and GitHub Actions. CodeQL (`.github/workflows/codeql.yml`) analyzes JavaScript and TypeScript on pull requests. JavaScript does not need a CodeQL build step.
 
