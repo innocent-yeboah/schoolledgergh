@@ -126,7 +126,8 @@ describe("password reset", () => {
     expect(PASSWORD_UPDATED_MESSAGE).toBe("Your password has been updated.");
   });
 
-  it("leaves the reset page reachable for the recovery session", () => {
+  it("leaves the callback and reset page reachable while signed out", () => {
+    expect(decideRedirect({ pathname: "/auth/callback", demo: "", signedIn: false, supabaseConfigured: true })).toBeNull();
     expect(decideRedirect({ pathname: "/reset-password", demo: "", signedIn: false, supabaseConfigured: true })).toBeNull();
     expect(decideRedirect({ pathname: "/reset-password", demo: "", signedIn: true, supabaseConfigured: true })).toBeNull();
   });
