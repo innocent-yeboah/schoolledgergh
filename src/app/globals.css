@@ -9,6 +9,7 @@
   --color-mint-100: #e6f4ec;
   --color-mint-200: #cce9d8;
   --color-gold-100: #fef0d6;
+  --color-gold-500: #c9a227;
   --color-gold-600: #b8730a;
   --color-clay-100: #fcecea;
   --color-clay-700: #9b2b1e;
@@ -38,4 +39,30 @@ input,
 select,
 textarea {
   font-size: 16px;
+}
+
+@keyframes sl-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.sl-enter {
+  animation: sl-enter 640ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.sl-enter-late {
+  animation-delay: 90ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sl-enter,
+  .sl-enter-late {
+    animation: none;
+  }
 }

@@ -85,8 +85,17 @@ describe("production demo mode", () => {
 
     const login = renderToStaticMarkup(createElement(LoginPage));
     expect(login).toContain("SchoolLedger GH");
+    expect(login).toContain("School fees, collected and tracked,");
     expect(login).not.toContain("Try the school demo");
     expect(login).not.toContain("Bright Future Academy");
+  });
+
+  it("shows the sample-school buttons only when demo mode is on", () => {
+    process.env.NEXT_PUBLIC_DEMO_MODE = "true";
+    const login = renderToStaticMarkup(createElement(LoginPage));
+    expect(login).toContain("Try the school demo");
+    expect(login).toContain("Try the admin demo");
+    expect(login).toContain("Demo mode works without them.");
   });
 
   it("still opens the sample school when demo mode is explicitly enabled", async () => {
